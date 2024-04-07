@@ -42,5 +42,7 @@ int main() {
            0,
            (struct sockaddr*) &client_addr,
            client_addr_len);
+
+    close(sockfd);
     return 0;
 }
