@@ -27,11 +27,11 @@ void* send_with_confirm(
     result_t result = { .error = 1 };
     while (result.error) {
         sendto(arg->sockfd,
-               arg->package->datagram.data,
-               arg->package->datagram.size,
+               arg->package,
+               sizeof(package_t),
                0,
                arg->addr,
-               sizeof(*arg->addr));
+               sizeof(arg->addr));
         recvfrom(arg->sockfd, &result, sizeof(result_t), 0, arg->addr, NULL);
     }
 
