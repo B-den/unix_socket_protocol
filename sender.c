@@ -1,3 +1,4 @@
+#include <cstring>
 #include <pthread.h>
 #include <stddef.h>
 #include <sys/socket.h>
@@ -20,9 +21,10 @@ struct send_arg {
 };
 
 void* send_with_confirm(
-        /*int sockfd, const package_t* package, const scinfo_t* sc_info*/ void* _arg
+        /*int sockfd, const package_t* package, const scinfo_t* sc_info*/
+        void* _arg
 ) {
-    struct send_arg* arg = (struct send_data*)_arg;
+    struct send_arg* arg = (struct send_data*) _arg;
 
     result_t result = { .error = 1 };
     while (result.error) {
@@ -45,21 +47,39 @@ struct timeout_arg {
 };
 
 void* timeout(void* _arg) {
-    struct timeout_arg* arg = (struct timeout_arg*)_arg;
-    struct timespec remaining, request = {0, arg->nanosecs};
+    struct timeout_arg* arg = (struct timeout_arg*) _arg;
+    struct timespec remaining, request = { 0, arg->nanosecs };
     nanosleep(&request, &remaining);
     pthread_cancel(arg->tid_to_kill);
     return NULL;
 }
 
-int send_data(void* data, size_t len) {
+int send_data(void* data, size_t len, int sockfd, struct sockaddr_un* addr) {
     struct send_arg s_arg;
+    s_arg.sockfd = sockfd;
+    s_arg.addr = addr;
+
     struct timeout_arg t_arg;
     pthread_t s_tid, t_tid;
     pthread_attr_t s_attr, t_attr;
-    for (size_t offset = 0; offset < len; offset += BLOCK_SIZE) {
-        size_t actual_size = len - offset > BLOCK_SIZE? BLOCK_SIZE: len - offset;
+
+    unsigned int total_size
+            = len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1;
+    int order = 1;
+    for (size_t offset = 0; offset < len; offset += BLOCK_SIZE, order++) {
+        size_t actual_size
+                = len - offset > BLOCK_SIZE ? BLOCK_SIZE : len - offset;
         // todo
+        char* byte_data = (char*) data;
+        package_t package = {
+            .datagram = { .checksum = 1 },
+            .total_size = total_size,
+            .order_number = order
+        };
+        memcpy(package.datagram.data, byte_data, actual_size);
+        s_arg.package = &package;
+
+        // end todo
         int resend_counter = 0;
         for (int i = 0; i < RETRY_TIMES; i++) {
             s_arg.success = 0;
