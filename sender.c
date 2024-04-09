@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "packet.h"
+#include "checksum.h"
 
 #define RETRY_TIMES 5
 #define RESEND_TIMES 3
@@ -102,6 +103,7 @@ int send_data(
                (char*) data + num * BLOCK_SIZE,
                actual_size);
         s_arg.package.order_number = num;
+        s_arg.package.datagram.checksum = checksum(0, s_arg.package.datagram.data, actual_size);
 
         int resend_counter = 0;
         for (int i = 0; i < RETRY_TIMES; i++) {
