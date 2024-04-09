@@ -8,7 +8,8 @@
 
 #define RETRY_TIMES 5
 #define RESEND_TIMES 3
-#define RETRY_TIMEOUT 50000 // nanosecs     // yet to experiment; context switch takes ~1500ns
+#define RETRY_TIMEOUT \
+    50000 // nanosecs     // yet to experiment; context switch takes ~1500ns
 #define BLOCK_SIZE 1024
 
 struct send_arg {
@@ -20,9 +21,10 @@ struct send_arg {
 };
 
 void* send_with_confirm(
-        /*int sockfd, const package_t* package, const scinfo_t* sc_info*/ void* _arg
+        /*int sockfd, const package_t* package, const scinfo_t* sc_info*/
+        void* _arg
 ) {
-    struct send_arg* arg = (struct send_data*)_arg;
+    struct send_arg* arg = (struct send_data*) _arg;
 
     result_t result = { .error = 1 };
     while (result.error) {
@@ -45,8 +47,8 @@ struct timeout_arg {
 };
 
 void* timeout(void* _arg) {
-    struct timeout_arg* arg = (struct timeout_arg*)_arg;
-    struct timespec remaining, request = {0, arg->nanosecs};
+    struct timeout_arg* arg = (struct timeout_arg*) _arg;
+    struct timespec remaining, request = { 0, arg->nanosecs };
     nanosleep(&request, &remaining);
     pthread_cancel(arg->tid_to_kill);
     return NULL;
@@ -59,7 +61,12 @@ void fill_tmp_socket_addr(struct sockaddr_un* addr) {
     memcpy(addr->sun_path, tmp_name, sizeof(tmp_name));
 }
 
-int send_data(int sockfd, void* data, size_t len, struct sockaddr_un* addr /*NULL-able*/) {
+int send_data(
+        int sockfd,
+        void* data,
+        size_t len,
+        struct sockaddr_un* addr /*NULL-able*/
+) {
     struct send_arg s_arg;
     struct timeout_arg t_arg;
     pthread_t s_tid, t_tid;
@@ -72,24 +79,30 @@ int send_data(int sockfd, void* data, size_t len, struct sockaddr_un* addr /*NUL
         client_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
         to_clear = 1;
         unlink(addr->sun_path);
-        if (bind(client_socket, (const struct sockaddr*) addr, sizeof(*addr)) < 0) {
+        if (bind(client_socket, (const struct sockaddr*) addr, sizeof(*addr))
+            < 0) {
             perror("binding in sender");
             rc = 1;
             goto exit;
-        }    
+        }
     }
 
     s_arg.sockfd = sockfd;
     s_arg.addr = addr;
     s_arg.tid_to_kill = &t_tid;
-    s_arg.package.total_size = (unsigned int)(len % BLOCK_SIZE == 0? len / BLOCK_SIZE: len / BLOCK_SIZE + 1);
+    s_arg.package.total_size = (unsigned int
+    ) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
 
     t_arg.nanosecs = RETRY_TIMEOUT;
     t_arg.tid_to_kill = &s_tid;
 
     for (size_t num = 0; num * BLOCK_SIZE < len; num++) {
-        size_t actual_size = len - num * BLOCK_SIZE > BLOCK_SIZE? BLOCK_SIZE: len - num * BLOCK_SIZE;
-        memcpy(s_arg.package.datagram.data, (char*)data + num * BLOCK_SIZE, actual_size);
+        size_t actual_size = len - num * BLOCK_SIZE > BLOCK_SIZE
+                ? BLOCK_SIZE
+                : len - num * BLOCK_SIZE;
+        memcpy(s_arg.package.datagram.data,
+               (char*) data + num * BLOCK_SIZE,
+               actual_size);
         s_arg.package.order_number = num;
 
         int resend_counter = 0;
