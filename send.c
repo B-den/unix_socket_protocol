@@ -62,33 +62,43 @@ void fill_tmp_client_socket_addr(struct sockaddr_un* addr) {
 }
 
 int send_data(
-        int sockfd,
+        int sockfd, /*NULL-able*/
+        const char* target_socket_filename,
         void* data,
         size_t len,
-        struct sockaddr_un* addr /*NULL-able*/
+        struct sockaddr_un* local_addr /*NULL-able*/ // if not NULL => binded
 ) {
+    if (strlen(target_socket_filename) < 1) {
+        perror("invalid argument: target socket filename required");
+        return 1;
+    }
+
     struct send_arg s_arg;
     struct timeout_arg t_arg;
     pthread_t s_tid, t_tid;
     pthread_attr_t s_attr, t_attr;
-    int to_clear = 0, rc = 0, client_socket;
-    if (addr == NULL) {
+
+    int close_socket = 0, unlink_addr = 0, rc = 0;
+    if (sockfd == 0) {
+        sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
+        close_socket = 1;
+    }
+    if (local_addr == NULL || close_socket) {
         struct sockaddr_un a;
-        addr = &a;
-        fill_tmp_socket_addr(addr);
-        client_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
-        to_clear = 1;
-        unlink(addr->sun_path);
-        if (bind(client_socket, (const struct sockaddr*) addr, sizeof(*addr))
+        local_addr = &a;
+        fill_tmp_socket_addr(local_addr);
+        unlink(local_addr->sun_path);
+        if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(*local_addr))
             < 0) {
             perror("binding in sender");
             rc = 1;
             goto exit;
         }
+        unlink_addr = 1;
     }
 
     s_arg.sockfd = sockfd;
-    s_arg.addr = addr;
+    s_arg.addr = local_addr;
     s_arg.tid_to_kill = &t_tid;
     s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
 
@@ -120,10 +130,9 @@ int send_data(
             goto exit;
         }
     }
+
 exit:
-    if (to_clear) {
-        close(client_socket);
-        // unlink does receiving side
-    }
+    if (close_socket) close(sockfd);
+    if (unlink_addr) unlink(local_addr->sun_path);
     return rc;
 }
