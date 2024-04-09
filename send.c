@@ -54,7 +54,7 @@ void* timeout(void* _arg) {
     return NULL;
 }
 
-void fill_tmp_socket_addr(struct sockaddr_un* addr) {
+void fill_tmp_client_socket_addr(struct sockaddr_un* addr) {
     // todo (no)
     addr->sun_family = AF_UNIX;
     const char* tmp_name = "/tmp/usp_tmp_client_socket";
@@ -123,7 +123,7 @@ int send_data(
 exit:
     if (to_clear) {
         close(client_socket);
-        unlink(addr->sun_path);
+        // unlink does receiving side
     }
     return rc;
 }
