@@ -8,8 +8,7 @@
 
 #define RETRY_TIMES 5
 #define RESEND_TIMES 3
-#define RETRY_TIMEOUT \
-    50000 // nanosecs     // yet to experiment; context switch takes ~1500ns
+#define RETRY_TIMEOUT 50000 // nanosecs     // yet to experiment; context switch takes ~1500ns
 #define BLOCK_SIZE 1024
 
 struct send_arg {
@@ -90,8 +89,7 @@ int send_data(
     s_arg.sockfd = sockfd;
     s_arg.addr = addr;
     s_arg.tid_to_kill = &t_tid;
-    s_arg.package.total_size = (unsigned int
-    ) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
+    s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
 
     t_arg.nanosecs = RETRY_TIMEOUT;
     t_arg.tid_to_kill = &s_tid;
