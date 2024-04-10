@@ -2,7 +2,8 @@
 CC="gcc"
 IGNORE="./tools"
 FSANITIZER="-fsanitize=address"
-CFLAGS="-lpthread"
+CFLAGS="-O2"
+
 
 format: .clang-format
 	find . -path $(IGNORE) -prune -o -regex '.*\.\(cpp\|hpp\|cu\|cuh\|c\|h\)' -exec clang-format -style=file -i {} \;
@@ -10,7 +11,8 @@ format: .clang-format
 test: test.c
 
 
-all: format test
+all: format
+	$(CC) -o main main.c send.c receive.c tools/crcspeed/crc64speed.c tools/crcspeed/crcspeed.c $(CFLAGS) $(FSANITIER)
 
 example:
 	$(CC) -o r examples/receiver.c $(CFLAGS) $(FSANITIZER); $(CC) -o s examples/sender.c $(CFLAGS) $(FSANITIZER)

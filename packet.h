@@ -1,17 +1,19 @@
 #ifndef __PACKET_H__
 #define __PACKET_H__
 
+#include <stdint.h>
+
 #define BUF_LEN 1024
 
-#define RETRY_TIMES 5
+#define RETRY_TIMES 50
 #define RESEND_TIMES 3
-#define RETRY_TIMEOUT 50 // microsecs     // yet to experiment; context switch takes ~1500ns
+#define RETRY_TIMEOUT 500 // microsecs     // yet to experiment; context switch takes ~1500ns
 #define BLOCK_SIZE 1024
 
 #include <stddef.h>
 
 typedef struct datagram {
-    long int checksum;
+    uint64_t checksum;
     size_t len;
     char data[BUF_LEN];
 } datagram_t;
