@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -63,6 +64,7 @@ int send_data(
     FD_SET(sockfd, &file_descriptor_set);
 
     struct sockaddr_un addr;
+    bzero(&addr, sizeof(addr));
     memcpy(addr.sun_path, target_socket_filename, strlen(target_socket_filename));
     addr.sun_family = AF_UNIX;
     s_arg.sockfd = sockfd;
@@ -76,7 +78,7 @@ int send_data(
         memcpy(s_arg.package.datagram.data,
                (char*) data + num * BLOCK_SIZE,
                actual_size);
-        s_arg.package.order_number = num;
+        s_arg.package.order_number = num + 1;
         s_arg.package.datagram.checksum = checksum(0, s_arg.package.datagram.data, actual_size);
         s_arg.package.datagram.len = actual_size;
 
@@ -99,11 +101,10 @@ int send_data(
                 // printf("Data is available now.\n");
                 /* FD_ISSET(0, &rfds) will be true. */
             } else {
-                // printf("No data within five seconds.\n");
+                fprintf(stderr, "receive timeout expired\n");
                 continue;
             }
-
-            recvfrom(s_arg.sockfd, &s_arg.error, sizeof(s_arg.error), 0, NULL, NULL);
+            recvfrom(s_arg.sockfd, &s_arg.error, sizeof(s_arg.error), 0, (struct sockaddr*) s_arg.addr, NULL);
             if (s_arg.error && resend_counter < RESEND_TIMES) {
                 i--;
                 resend_counter++;

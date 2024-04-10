@@ -6,7 +6,6 @@
 
 int main() {
     char socket_filename[] = "mysckt.server";
-    char socket_filename_other[] = "mysckt.client";
     unlink(socket_filename);
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
