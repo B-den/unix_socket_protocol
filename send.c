@@ -3,14 +3,10 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
+#include <unistd.h>
 
-#include "packet.h"
 #include "checksum.h"
-
-#define RETRY_TIMES 5
-#define RESEND_TIMES 3
-#define RETRY_TIMEOUT 50000 // nanosecs     // yet to experiment; context switch takes ~1500ns
-#define BLOCK_SIZE 1024
+#include "packet.h"
 
 struct send_arg {
     pthread_t* tid_to_kill;
@@ -26,18 +22,18 @@ void* send_with_confirm(
 ) {
     struct send_arg* arg = (struct send_data*) _arg;
 
-    result_t result = { .error = 1 };
-    while (result.error) {
-        sendto(arg->sockfd,
-               &arg->package,
-               sizeof(package_t),
-               0,
-               arg->addr,
-               sizeof(arg->addr));
-        recvfrom(arg->sockfd, &result, sizeof(result_t), 0, arg->addr, NULL);
-    }
+    result_t result = {.error = 1};
+    sendto(arg->sockfd,
+           &arg->package,
+           sizeof(package_t),
+           0,
+           arg->addr,
+           sizeof(arg->addr));
+    recvfrom(arg->sockfd, &result, sizeof(result_t), 0, arg->addr, NULL);
 
-    pthread_cancel(arg->tid_to_kill);
+    arg->success = !result.error;
+    pthread_cancel(*arg->tid_to_kill);
+
     return NULL;
 }
 
@@ -50,14 +46,14 @@ void* timeout(void* _arg) {
     struct timeout_arg* arg = (struct timeout_arg*) _arg;
     struct timespec remaining, request = { 0, arg->nanosecs };
     nanosleep(&request, &remaining);
-    pthread_cancel(arg->tid_to_kill);
+    pthread_cancel(*arg->tid_to_kill);
     return NULL;
 }
 
 void fill_tmp_client_socket_addr(struct sockaddr_un* addr) {
     // todo (no)
     addr->sun_family = AF_UNIX;
-    const char* tmp_name = "/tmp/usp_tmp_client_socket";
+    const char tmp_name[] = "/tmp/usp_tmp_client_socket";
     memcpy(addr->sun_path, tmp_name, sizeof(tmp_name));
 }
 
@@ -86,7 +82,7 @@ int send_data(
     if (local_addr == NULL || close_socket) {
         struct sockaddr_un a;
         local_addr = &a;
-        fill_tmp_socket_addr(local_addr);
+        fill_tmp_client_socket_addr(local_addr);
         unlink(local_addr->sun_path);
         if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(*local_addr))
             < 0) {
@@ -100,7 +96,9 @@ int send_data(
     s_arg.sockfd = sockfd;
     s_arg.addr = local_addr;
     s_arg.tid_to_kill = &t_tid;
-    s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
+    s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 
+            ? len / BLOCK_SIZE 
+            : len / BLOCK_SIZE + 1);
 
     t_arg.nanosecs = RETRY_TIMEOUT;
     t_arg.tid_to_kill = &s_tid;
@@ -116,7 +114,8 @@ int send_data(
         s_arg.package.datagram.checksum = checksum(0, s_arg.package.datagram.data, actual_size);
 
         int resend_counter = 0;
-        for (int i = 0; i < RETRY_TIMES; i++) {
+        s_arg.success = 0;
+        for (int i = 0; i < RETRY_TIMES && !s_arg.success; i++) {
             s_arg.success = 0;
             pthread_create(&s_tid, &s_attr, send_with_confirm, &s_arg);
             pthread_create(&t_tid, &t_attr, timeout, &t_arg);
@@ -132,7 +131,11 @@ int send_data(
     }
 
 exit:
-    if (close_socket) close(sockfd);
-    if (unlink_addr) unlink(local_addr->sun_path);
+    if (close_socket) {
+        close(sockfd);
+    }
+    if (unlink_addr) {
+        unlink(local_addr->sun_path);
+    }
     return rc;
 }
