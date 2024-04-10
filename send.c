@@ -77,9 +77,6 @@ int send_data(
         unlink_addr = 1;
     }
 
-    FD_ZERO(&file_descriptor_set);
-    FD_SET(sockfd, &file_descriptor_set);
-
     s_arg.sockfd = sockfd;
     s_arg.addr = local_addr;
     s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
@@ -98,10 +95,15 @@ int send_data(
         int resend_counter = 0;
         s_arg.success = 1;
         for (int i = 0; i < RETRY_TIMES && !s_arg.success; i++) {
-            send_with_confirm(&s_arg);
+            sendto(s_arg.sockfd,
+                &s_arg.package,
+                sizeof(package_t),
+                0,
+                s_arg.addr,
+                sizeof(s_arg.addr));
             timeout.tv_sec = 0; timeout.tv_usec = RETRY_TIMEOUT;
-            int retval = select(sockfd, NULL, &file_descriptor_set, NULL, &timeout);
 
+            int retval = select(sockfd, NULL, &file_descriptor_set, NULL, &timeout);
             if (retval == -1) {
                 perror("select()");
             } else if (retval) {
@@ -111,6 +113,8 @@ int send_data(
                 // printf("No data within five seconds.\n");
                 continue;
             }
+            
+            recvfrom(s_arg.sockfd, s_arg.success, sizeof(s_arg.success), 0, s_arg.addr, NULL);
             if (s_arg.success && resend_counter < RESEND_TIMES) {
                 i--;
                 resend_counter++;
