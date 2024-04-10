@@ -11,28 +11,11 @@
 #include "packet.h"
 
 struct send_arg {
-    int success;
+    int error;
     int sockfd;
     package_t package;
     struct sockaddr_un* addr;
 };
-
-void* send_with_confirm(
-        /*int sockfd, const package_t* package, const scinfo_t* sc_info*/
-        void* _arg
-) {
-
-    struct send_arg* arg = (struct send_data*) _arg;
-    sendto(arg->sockfd,
-           &arg->package,
-           sizeof(package_t),
-           0,
-           arg->addr,
-           sizeof(arg->addr));
-    recvfrom(arg->sockfd, arg->success, sizeof(arg->success), 0, arg->addr, NULL);
-
-    return NULL;
-}
 
 void fill_tmp_client_socket_addr(struct sockaddr_un* addr) {
     // todo (no)
@@ -62,20 +45,21 @@ int send_data(
         sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
         close_socket = 1;
     }
-    fcntl(sockfd, F_SETFL, O_NONBLOCK);
     if (local_addr == NULL || close_socket) {
         struct sockaddr_un a;
         local_addr = &a;
         fill_tmp_client_socket_addr(local_addr);
         unlink(local_addr->sun_path);
-        if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(*local_addr))
-            < 0) {
+        if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(*local_addr)) < 0) {
             perror("binding in sender");
             rc = 1;
             goto exit;
         }
         unlink_addr = 1;
     }
+
+    FD_ZERO(&file_descriptor_set);
+    FD_SET(sockfd, &file_descriptor_set);
 
     s_arg.sockfd = sockfd;
     s_arg.addr = local_addr;
@@ -93,16 +77,16 @@ int send_data(
         s_arg.package.datagram.len = actual_size;
 
         int resend_counter = 0;
-        s_arg.success = 1;
-        for (int i = 0; i < RETRY_TIMES && !s_arg.success; i++) {
+        s_arg.error = 1;  // unsuccess
+        for (int i = 0; i < RETRY_TIMES && !s_arg.error; i++) {
             sendto(s_arg.sockfd,
                 &s_arg.package,
                 sizeof(package_t),
                 0,
-                s_arg.addr,
-                sizeof(s_arg.addr));
-            timeout.tv_sec = 0; timeout.tv_usec = RETRY_TIMEOUT;
+                (struct sockaddr*)s_arg.addr,
+                sizeof(*s_arg.addr));
 
+            timeout.tv_sec = 0; timeout.tv_usec = RETRY_TIMEOUT;
             int retval = select(sockfd, NULL, &file_descriptor_set, NULL, &timeout);
             if (retval == -1) {
                 perror("select()");
@@ -113,16 +97,16 @@ int send_data(
                 // printf("No data within five seconds.\n");
                 continue;
             }
-            
-            recvfrom(s_arg.sockfd, s_arg.success, sizeof(s_arg.success), 0, s_arg.addr, NULL);
-            if (s_arg.success && resend_counter < RESEND_TIMES) {
+
+            recvfrom(s_arg.sockfd, &s_arg.error, sizeof(s_arg.error), 0, (struct sockaddr*)s_arg.addr, NULL);
+            if (s_arg.error && resend_counter < RESEND_TIMES) {
                 i--;
                 resend_counter++;
             } else {
                 break;
             }
         }
-        if (s_arg.success) {
+        if (s_arg.error) {
             rc = 1;
             goto exit;
         }
