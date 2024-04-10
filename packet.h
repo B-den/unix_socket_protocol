@@ -5,9 +5,9 @@
 
 #define BUF_LEN 1024
 
-#define RETRY_TIMES 50
+#define RETRY_TIMES 5
 #define RESEND_TIMES 3
-#define RETRY_TIMEOUT 500 // microsecs     // yet to experiment; context switch takes ~1500ns
+#define RETRY_TIMEOUT 100000 // microsecs     // yet to experiment; context switch takes ~1500ns
 #define BLOCK_SIZE 1024
 
 #include <stddef.h>

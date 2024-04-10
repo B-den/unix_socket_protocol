@@ -44,18 +44,18 @@ void* receive_data(size_t* data_len, int sockfd /*NULL-able*/, const char* targe
     }
 
     while (1) {
-        result_t result;
+        int result;
+        unsigned int sender_addr_len = sizeof(struct sockaddr_un);
         package_t received;
         struct sockaddr_un sender_addr;
-        recvfrom(sockfd, &received, sizeof(package_t), 0, (struct sockaddr*) &sender_addr, NULL);
-        printf("Before checksumm: %d-%d-%zu\n", received.total_size, received.order_number, received.datagram.len);
+        recvfrom(sockfd, &received, sizeof(package_t), 0, (struct sockaddr*) &sender_addr, &sender_addr_len);
         if (received.datagram.checksum != checksum(0, received.datagram.data, received.datagram.len)) {
-            result.error = 1;
-            sendto(sockfd, &result.error, sizeof(int), 0, (struct sockaddr*) &sender_addr, sizeof(sender_addr));
+            result = 1;
+            sendto(sockfd, &result, sizeof(int), 0, (struct sockaddr*) &sender_addr, sizeof(sender_addr));
             continue;
         }
-        result.error = 0;
-        sendto(sockfd, &result.error, sizeof(int), 0, (struct sockaddr*) &sender_addr, sizeof(sender_addr));
+        result = 0;
+        sendto(sockfd, &result, sizeof(int), 0, (struct sockaddr*) &sender_addr, sizeof(sender_addr));
 
         ret_data = realloc(ret_data, *data_len + received.datagram.len);
         memcpy(ret_data + *data_len, received.datagram.data, received.datagram.len);
