@@ -11,7 +11,6 @@
 #include "packet.h"
 
 struct send_arg {
-    // pthread_t* tid_to_kill;
     int success;
     int sockfd;
     package_t package;
@@ -22,9 +21,8 @@ void* send_with_confirm(
         /*int sockfd, const package_t* package, const scinfo_t* sc_info*/
         void* _arg
 ) {
-    struct send_arg* arg = (struct send_data*) _arg;
 
-    // result_t result = { .error = 1 };
+    struct send_arg* arg = (struct send_data*) _arg;
     sendto(arg->sockfd,
            &arg->package,
            sizeof(package_t),
@@ -33,24 +31,8 @@ void* send_with_confirm(
            sizeof(arg->addr));
     recvfrom(arg->sockfd, arg->success, sizeof(arg->success), 0, arg->addr, NULL);
 
-    // arg->success = !result.error;
-    // pthread_cancel(*arg->tid_to_kill);
-
     return NULL;
 }
-
-// struct timeout_arg {
-//     pthread_t* tid_to_kill;
-//     unsigned int nanosecs;
-// };
-
-// void* timeout(void* _arg) {
-//     struct timeout_arg* arg = (struct timeout_arg*) _arg;
-//     struct timespec remaining, request = { 0, arg->nanosecs };
-//     nanosleep(&request, &remaining);
-//     pthread_cancel(*arg->tid_to_kill);
-//     return NULL;
-// }
 
 void fill_tmp_client_socket_addr(struct sockaddr_un* addr) {
     // todo (no)
@@ -60,7 +42,7 @@ void fill_tmp_client_socket_addr(struct sockaddr_un* addr) {
 }
 
 int send_data(
-        int sockfd, /*NULL-able*/ // must be nonblock!!
+        int sockfd, /*NULL-able*/
         const char* target_socket_filename,
         void* data,
         size_t len,
@@ -72,10 +54,6 @@ int send_data(
     }
 
     struct send_arg s_arg;
-    // struct timeout_arg t_arg;
-    // pthread_t s_tid, t_tid;
-    // pthread_attr_t s_attr, t_attr;
-
     fd_set file_descriptor_set;
     struct timeval timeout = {0, RETRY_TIMEOUT}; // in microsecs
 
@@ -104,11 +82,7 @@ int send_data(
 
     s_arg.sockfd = sockfd;
     s_arg.addr = local_addr;
-    // s_arg.tid_to_kill = &t_tid;
     s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
-
-    // t_arg.nanosecs = RETRY_TIMEOUT;
-    // t_arg.tid_to_kill = &s_tid;
 
     for (size_t num = 0; num * BLOCK_SIZE < len; num++) {
         size_t actual_size = len - num * BLOCK_SIZE > BLOCK_SIZE
@@ -122,23 +96,29 @@ int send_data(
         s_arg.package.datagram.len = actual_size;
 
         int resend_counter = 0;
-        s_arg.success = 0;
+        s_arg.success = 1;
         for (int i = 0; i < RETRY_TIMES && !s_arg.success; i++) {
-            s_arg.success = 0;
-            // pthread_create(&s_tid, &s_attr, send_with_confirm, &s_arg);
-            // pthread_create(&t_tid, &t_attr, timeout, &t_arg);
-            // pthread_join(s_tid, NULL);
-            
             send_with_confirm(&s_arg);
             timeout.tv_sec = 0; timeout.tv_usec = RETRY_TIMEOUT;
             int retval = select(sockfd, NULL, &file_descriptor_set, NULL, &timeout);
 
-
-            if (!s_arg.success && resend_counter < RESEND_TIMES) {
+            if (retval == -1) {
+                perror("select()");
+            } else if (retval) {
+                // printf("Data is available now.\n");
+                /* FD_ISSET(0, &rfds) will be true. */
+            } else {
+                // printf("No data within five seconds.\n");
+                continue;
+            }
+            if (s_arg.success && resend_counter < RESEND_TIMES) {
                 i--;
+                resend_counter++;
+            } else {
+                break;
             }
         }
-        if (!s_arg.success) {
+        if (s_arg.success) {
             rc = 1;
             goto exit;
         }
