@@ -65,7 +65,7 @@ int send_data(
 
     struct sockaddr_un addr;
     bzero(&addr, sizeof(addr));
-    memcpy(addr.sun_path, target_socket_filename, strlen(target_socket_filename));
+    memcpy(addr.sun_path, target_socket_filename, strlen(target_socket_filename) + 1);
     addr.sun_family = AF_UNIX;
     s_arg.sockfd = sockfd;
     s_arg.addr = &addr;

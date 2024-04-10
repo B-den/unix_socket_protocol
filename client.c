@@ -17,16 +17,16 @@ int main() {
         return 1;
     }
 
-    struct sockaddr_un send_addr;
-    send_addr.sun_family = AF_UNIX;
-    memcpy(send_addr.sun_path, sending_sockname, sizeof(sending_sockname));
-    unlink(sending_sockname);
-    if (bind(sending_scfd, (struct sockaddr*) &send_addr, sizeof(send_addr)) < 0) {
-        perror("send bind");
-        return 1;
-    }
+    // struct sockaddr_un send_addr;
+    // send_addr.sun_family = AF_UNIX;
+    // memcpy(send_addr.sun_path, sending_sockname, sizeof(sending_sockname));
+    // unlink(sending_sockname);
+    // if (bind(sending_scfd, (struct sockaddr*) &send_addr, sizeof(send_addr)) < 0) {
+    //     perror("send bind");
+    //     return 1;
+    // }
 
-    int res = send_data(sending_scfd, receiving_sockname, data, data_len, &send_addr);
+    int res = send_data(0, receiving_sockname, data, data_len, NULL);
     unlink(sending_sockname);
     close(sending_scfd);
     return res;

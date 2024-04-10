@@ -28,13 +28,12 @@ void* receive_data(size_t* data_len, int sockfd /*NULL-able*/, const char* targe
     }
     if (local_addr == NULL || close_socket) {
         struct sockaddr_un addr;
-        memcpy(addr.sun_path, target_filename, strlen(target_filename));
+        memcpy(addr.sun_path, target_filename, strlen(target_filename) + 1);
         addr.sun_family = AF_UNIX;
         local_addr = &addr;
-        server_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
         close_socket = 1;
         unlink(local_addr->sun_path);
-        if (bind(server_socket, (const struct sockaddr*) local_addr, sizeof(addr))
+        if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(addr))
             < 0) {
             perror("binding in sender");
             rc = 1;
