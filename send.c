@@ -22,7 +22,7 @@ void* send_with_confirm(
 ) {
     struct send_arg* arg = (struct send_data*) _arg;
 
-    result_t result = {.error = 1};
+    result_t result = { .error = 1 };
     sendto(arg->sockfd,
            &arg->package,
            sizeof(package_t),
@@ -96,9 +96,7 @@ int send_data(
     s_arg.sockfd = sockfd;
     s_arg.addr = local_addr;
     s_arg.tid_to_kill = &t_tid;
-    s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 
-            ? len / BLOCK_SIZE 
-            : len / BLOCK_SIZE + 1);
+    s_arg.package.total_size = (unsigned int) (len % BLOCK_SIZE == 0 ? len / BLOCK_SIZE : len / BLOCK_SIZE + 1);
 
     t_arg.nanosecs = RETRY_TIMEOUT;
     t_arg.tid_to_kill = &s_tid;
@@ -112,6 +110,7 @@ int send_data(
                actual_size);
         s_arg.package.order_number = num;
         s_arg.package.datagram.checksum = checksum(0, s_arg.package.datagram.data, actual_size);
+        s_arg.package.datagram.len = actual_size;
 
         int resend_counter = 0;
         s_arg.success = 0;

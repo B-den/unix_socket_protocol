@@ -8,11 +8,11 @@
 #define RETRY_TIMEOUT 50000 // nanosecs     // yet to experiment; context switch takes ~1500ns
 #define BLOCK_SIZE 1024
 
-
 #include <stddef.h>
 
 typedef struct datagram {
     long int checksum;
+    size_t len;
     char data[BUF_LEN];
 } datagram_t;
 
