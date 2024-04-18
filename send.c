@@ -50,7 +50,13 @@ int send_data(
         if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(*local_addr)) < 0) {
             perror("binding in sender");
             rc = 1;
-            goto exit;
+    		if (close_socket) {
+				close(sockfd);
+			}
+			if (unlink_addr) {
+				unlink(local_addr->sun_path);
+			}
+			return rc;
         }
         unlink_addr = 1;
     }
@@ -108,11 +114,16 @@ int send_data(
         if (error) {
             perror("error == 1");
             rc = 1;
-            goto exit;
+    		if (close_socket) {
+				close(sockfd);
+			}
+			if (unlink_addr) {
+				unlink(local_addr->sun_path);
+			}
+			return rc;
         }
     }
 
-exit:
     if (close_socket) {
         close(sockfd);
     }

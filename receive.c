@@ -33,11 +33,16 @@ void* receive_data(size_t* data_len, int sockfd /*NULL-able*/, const char* targe
         local_addr = &addr;
         close_socket = 1;
         unlink(local_addr->sun_path);
-        if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(addr))
-            < 0) {
+        if (bind(sockfd, (const struct sockaddr*) local_addr, sizeof(addr)) < 0) {
             perror("binding in sender");
             rc = 1;
-            goto exit;
+			if (close_socket) {
+				close(sockfd);
+			}
+			if (unlink_addr) {
+				unlink(local_addr->sun_path);
+			}
+			return ret_data;
         }
         unlink_addr = 1;
     }
@@ -64,7 +69,6 @@ void* receive_data(size_t* data_len, int sockfd /*NULL-able*/, const char* targe
         }
     }
 
-exit:
     if (close_socket) {
         close(sockfd);
     }
